@@ -10,25 +10,17 @@ local VirtualUser = game:GetService("VirtualUser")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local Settings = {
-    -- Аимбот
     AimEnabled = false, AimFOV = 150, AimSmooth = 0.4, MaxAimDistance = 100,
     LockTarget = true, CurrentTarget = nil,
-    
-    -- Фарм мобов
-    AutoFarm = false, FarmRange = 30,
-    
-    -- Фарм предметов
+    AutoFarm = false, FarmRange = 45,
     AutoItemFarm = false, ItemFarmRange = 500, TPBack = true,
-    
-    -- Движение
     WalkSpeedEnabled = false, WalkSpeed = 50, InfJump = false,
-    
-    -- Визуал
-    ESPEnabled = true
+    ESPEnabled = true, AutoBlock = false, LastHealth = 100,
+    RemoveSkins = false -- Настройка для ультра-буста
 }
 
 local Window = Rayfield:CreateWindow({
-   Name = "YBA GOD MODE | SWILL",
+   Name = "YBA GOD MODE V5 | SWILL",
    LoadingTitle = "Загрузка...",
    LoadingSubtitle = "by Swill Way",
    Theme = "Amethyst",
@@ -38,10 +30,11 @@ local Window = Rayfield:CreateWindow({
 local AimTab = Window:CreateTab("Аимбот", nil)
 local FarmTab = Window:CreateTab("Фарм", nil)
 local MoveTab = Window:CreateTab("Движение", nil)
+local CombatTab = Window:CreateTab("Бой & Блок", nil)
 local VisualTab = Window:CreateTab("Визуал & Оптимизация", nil)
 
 -- ==========================================
--- ВКЛАДКА АИМБОТ
+-- АИМБОТ
 -- ==========================================
 AimTab:CreateToggle({Name = "Включить Аимбот", CurrentValue = false, Flag = "AimToggle", Callback = function(Value) Settings.AimEnabled = Value; if not Value then Settings.CurrentTarget = nil end end})
 AimTab:CreateToggle({Name = "Lock Target (Залипание)", CurrentValue = true, Flag = "LockToggle", Callback = function(Value) Settings.LockTarget = Value end})
@@ -50,49 +43,76 @@ AimTab:CreateSlider({Name = "Радиус FOV (экран)", Range = {50, 500}, 
 AimTab:CreateSlider({Name = "Плавность", Range = {1, 10}, Increment = 1, CurrentValue = 4, Flag = "AimSmooth", Callback = function(Value) Settings.AimSmooth = Value / 10 end})
 
 -- ==========================================
--- ВКЛАДКА ФАРМ
+-- ФАРМ
 -- ==========================================
 FarmTab:CreateToggle({Name = "Auto-Farm Мобов", CurrentValue = false, Flag = "AutoFarm", Callback = function(Value) Settings.AutoFarm = Value end})
-FarmTab:CreateSlider({Name = "Радиус мобов", Range = {10, 100}, Increment = 5, Suffix = "студ.", CurrentValue = 30, Flag = "FarmRange", Callback = function(Value) Settings.FarmRange = Value end})
-
-FarmTab:CreateToggle({Name = "Auto-Item Farm (Стрелы/Рокака)", CurrentValue = false, Flag = "AutoItemFarm", Callback = function(Value) Settings.AutoItemFarm = Value end})
-FarmTab:CreateSlider({Name = "Радиус поиска предметов", Range = {50, 1000}, Increment = 50, Suffix = "студ.", CurrentValue = 500, Flag = "ItemFarmRange", Callback = function(Value) Settings.ItemFarmRange = Value end})
-FarmTab:CreateToggle({Name = "TP Back (Возврат на место)", CurrentValue = true, Flag = "TPBack", Callback = function(Value) Settings.TPBack = Value end})
+FarmTab:CreateSlider({Name = "Радиус мобов", Range = {10, 100}, Increment = 5, Suffix = "студ.", CurrentValue = 45, Flag = "FarmRange", Callback = function(Value) Settings.FarmRange = Value end})
+FarmTab:CreateToggle({Name = "Auto-Item Farm (Умный)", CurrentValue = false, Flag = "AutoItemFarm", Callback = function(Value) Settings.AutoItemFarm = Value end})
+FarmTab:CreateSlider({Name = "Радиус поиска", Range = {50, 2000}, Increment = 50, Suffix = "студ.", CurrentValue = 500, Flag = "ItemFarmRange", Callback = function(Value) Settings.ItemFarmRange = Value end})
+FarmTab:CreateToggle({Name = "TP Back (Возврат)", CurrentValue = true, Flag = "TPBack", Callback = function(Value) Settings.TPBack = Value end})
 
 -- ==========================================
--- ВКЛАДКА ДВИЖЕНИЕ
+-- БОЙ & БЛОК
+-- ==========================================
+CombatTab:CreateToggle({Name = "Auto-Block (Авто-блок)", CurrentValue = false, Flag = "AutoBlockToggle", Callback = function(Value) Settings.AutoBlock = Value end})
+
+-- ==========================================
+-- ДВИЖЕНИЕ
 -- ==========================================
 MoveTab:CreateToggle({Name = "Speed Hack (Ускорение)", CurrentValue = false, Flag = "SpeedToggle", Callback = function(Value) Settings.WalkSpeedEnabled = Value; local char = LocalPlayer.Character; if char and char:FindFirstChild("Humanoid") then char.Humanoid.WalkSpeed = Value and Settings.WalkSpeed or 16 end end})
 MoveTab:CreateSlider({Name = "Скорость", Range = {16, 200}, Increment = 5, Suffix = "spd", CurrentValue = 50, Flag = "SpeedValue", Callback = function(Value) Settings.WalkSpeed = Value; if Settings.WalkSpeedEnabled then local char = LocalPlayer.Character; if char and char:FindFirstChild("Humanoid") then char.Humanoid.WalkSpeed = Value end end end})
 MoveTab:CreateToggle({Name = "Infinite Jump (Беск. прыжок)", CurrentValue = false, Flag = "InfJumpToggle", Callback = function(Value) Settings.InfJump = Value end})
 
 -- ==========================================
--- ВКЛАДКА ВИЗУАЛ & ОПТИМИЗАЦИЯ
+-- ВИЗУАЛ & ОПТИМИЗАЦИЯ
 -- ==========================================
 VisualTab:CreateButton({
-   Name = "FPS BOOST (Снести текстуры)",
+   Name = "ULTRA FPS BOOST (Без скинов)",
    Callback = function()
+       Settings.RemoveSkins = true
+       -- 1. Убираем графику
        pcall(function()
            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
            settings().Rendering.AntiAliasingQuality = Enum.AntiAliasingQuality.QualityLevel1
        end)
        Lighting.GlobalShadows = false
        Lighting.FogEnd = 9e9
+       
+       -- 2. Сносим все эффекты (частицы, свет, тени)
        for _, v in pairs(Lighting:GetDescendants()) do
            if v:IsA("PostEffect") or v:IsA("Sky") or v:IsA("Atmosphere") or v:IsA("BloomEffect") or v:IsA("BlurEffect") or v:IsA("ColorCorrectionEffect") or v:IsA("SunRaysEffect") then v:Destroy() end
        end
+       
+       -- 3. Сносим текстуры и эффекты в мире
        for _, v in pairs(Workspace:GetDescendants()) do
            if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then v:Destroy() end
            if v:IsA("Decal") or v:IsA("Texture") then v.Transparency = 1 end
            if v:IsA("BasePart") and v.Material ~= Enum.Material.Plastic and v.Material ~= Enum.Material.SmoothPlastic and v.Material ~= Enum.Material.Neon then v.Material = Enum.Material.SmoothPlastic end
        end
-       Rayfield:Notify({Title = "FPS BOOST", Content = "Графика снижена!", Duration = 3})
+       
+       -- 4. Убираем скины со ВСЕХ игроков (включая тебя)
+       local function stripCharacter(char)
+           if char then
+               for _, v in pairs(char:GetDescendants()) do
+                   if v:IsA("Accessory") or v:IsA("Shirt") or v:IsA("Pants") or v:IsA("ShirtGraphic") or v:IsA("Highlight") then
+                       v:Destroy()
+                   end
+               end
+           end
+       end
+       
+       for _, plr in ipairs(Players:GetPlayers()) do
+           if plr.Character then stripCharacter(plr.Character) end
+       end
+       Players.PlayerAdded:Connect(function(plr) plr.CharacterAdded:Connect(function(char) task.wait(0.5) stripCharacter(char) end) end)
+       
+       Rayfield:Notify({Title = "ULTRA BOOST", Content = "Скины снесены, FPS максимальный!", Duration = 5})
    end,
 })
 VisualTab:CreateToggle({Name = "ESP (Подсветка игроков)", CurrentValue = true, Flag = "EspToggle", Callback = function(Value) Settings.ESPEnabled = Value end})
 
 -- ==========================================
--- ЛОГИКА ESP (ТОЛЬКО БЛИЗКИЕ ИГРОКИ)
+-- ЛОГИКА ESP
 -- ==========================================
 local function applyESP(character)
     if not character then return end
@@ -124,8 +144,6 @@ local function applyESP(character)
         local myRoot = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
         local dist = 0
         if myRoot then dist = math.floor((myRoot.Position - root.Position).Magnitude) end
-        
-        -- Показываем только тех, кто в радиусе 300 метров
         if dist <= 300 then
             billboard.Enabled = true
             local hpPercent = math.floor((humanoid.Health / humanoid.MaxHealth) * 100)
@@ -158,7 +176,7 @@ UserInputService.JumpRequest:Connect(function()
 end)
 
 -- ==========================================
--- ЛОГИКА АИМБОТА (С ЗАЛИПАНИЕМ)
+-- ЛОГИКА АИМБОТА
 -- ==========================================
 local function isTargetValid(targetChar)
     if not targetChar or not targetChar.Parent then return false end
@@ -200,26 +218,19 @@ RunService.RenderStepped:Connect(function()
     if Settings.AimEnabled then
         if Settings.LockTarget then
             if Settings.CurrentTarget and isTargetValid(Settings.CurrentTarget) then
-                -- Держим текущую
-            else
-                Settings.CurrentTarget = findBestTarget()
-            end
-        else
-            Settings.CurrentTarget = findBestTarget()
-        end
+            else Settings.CurrentTarget = findBestTarget() end
+        else Settings.CurrentTarget = findBestTarget() end
 
         if Settings.CurrentTarget and Settings.CurrentTarget:FindFirstChild("Head") then
             local currentCFrame = Camera.CFrame
             local targetCFrame = CFrame.new(currentCFrame.Position, Settings.CurrentTarget.Head.Position)
             Camera.CFrame = currentCFrame:Lerp(targetCFrame, Settings.AimSmooth)
         end
-    else
-        Settings.CurrentTarget = nil
-    end
+    else Settings.CurrentTarget = nil end
 end)
 
 -- ==========================================
--- ЛОГИКА AUTO-FARM МОБОВ (БЕЗ ВЫЛЕТОВ)
+-- ЛОГИКА AUTO-FARM МОБОВ
 -- ==========================================
 task.spawn(function()
     while task.wait(0.2) do
@@ -245,40 +256,53 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- ЛОГИКА AUTO-ITEM FARM (ТЕЛЕПОРТ + КНОПКА E)
+-- ЛОГИКА AUTO-ITEM FARM
 -- ==========================================
 task.spawn(function()
-    while task.wait(1.5) do
+    while task.wait(0.5) do
         if Settings.AutoItemFarm then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("HumanoidRootPart") then
-                local originalCFrame = char.HumanoidRootPart.CFrame
-                local myPos = originalCFrame.Position
-                local foundItem = nil
-
-                for _, v in pairs(Workspace:GetDescendants()) do
-                    local itemName = v.Name:lower()
-                    if (itemName:find("arrow") or itemName:find("rokakaka") or itemName:find("item") or itemName:find("drop")) and not v:IsDescendantOf(char) then
-                        local targetPart = v:IsA("BasePart") and v or v:FindFirstChild("Handle") or v.PrimaryPart
-                        if targetPart then
-                            local dist = (targetPart.Position - myPos).Magnitude
-                            if dist <= Settings.ItemFarmRange then
-                                foundItem = targetPart
-                                break
-                            end
-                        end
+                local foundPickUp = false
+                for _, v in pairs(game:GetService("CoreGui"):GetDescendants()) do
+                    if v:IsA("TextLabel") and (v.Text:lower():find("pick up") or v.Text:lower():find("arrow") or v.Text:lower():find("rokakaka")) then
+                        foundPickUp = true; break
                     end
                 end
-
-                if foundItem then
-                    char.HumanoidRootPart.CFrame = foundItem.CFrame
-                    task.wait(0.3)
+                
+                if foundPickUp then
                     VirtualInputManager:SendKeyEvent(true, "E", false, game)
                     task.wait(0.1)
                     VirtualInputManager:SendKeyEvent(false, "E", false, game)
-                    if Settings.TPBack then
+                    task.wait(0.5)
+                else
+                    local originalCFrame = char.HumanoidRootPart.CFrame
+                    local myPos = originalCFrame.Position
+                    local foundItem = nil
+
+                    for _, v in pairs(Workspace:GetDescendants()) do
+                        local itemName = v.Name:lower()
+                        if (itemName:find("arrow") or itemName:find("rokakaka") or itemName:find("coin") or itemName:find("scroll") or itemName:find("rib cage")) and not v:IsDescendantOf(char) then
+                            local targetPart = v:IsA("BasePart") and v or v:FindFirstChild("Handle") or v.PrimaryPart
+                            if targetPart then
+                                local dist = (targetPart.Position - myPos).Magnitude
+                                if dist <= Settings.ItemFarmRange then
+                                    foundItem = targetPart; break
+                                end
+                            end
+                        end
+                    end
+
+                    if foundItem then
+                        char.HumanoidRootPart.CFrame = foundItem.CFrame
                         task.wait(0.3)
-                        char.HumanoidRootPart.CFrame = originalCFrame
+                        VirtualInputManager:SendKeyEvent(true, "E", false, game)
+                        task.wait(0.3)
+                        VirtualInputManager:SendKeyEvent(false, "E", false, game)
+                        if Settings.TPBack then
+                            task.wait(0.2)
+                            char.HumanoidRootPart.CFrame = originalCFrame
+                        end
                     end
                 end
             end
@@ -286,4 +310,49 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "YBA GOD MODE", Content = "Готово к работе!", Duration = 5})
+-- ==========================================
+-- ЛОГИКА AUTO-BLOCK
+-- ==========================================
+local blockHeld = false
+task.spawn(function()
+    while task.wait(0.1) do
+        if Settings.AutoBlock then
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("Humanoid") then
+                local hum = char.Humanoid
+                local myPos = char:FindFirstChild("HumanoidRootPart") and char.HumanoidRootPart.Position
+                
+                if myPos then
+                    local enemyClose = false
+                    for _, plr in ipairs(Players:GetPlayers()) do
+                        if plr ~= LocalPlayer then
+                            local pChar = plr.Character
+                            if pChar and pChar:FindFirstChild("HumanoidRootPart") and pChar:FindFirstChild("Humanoid") and pChar.Humanoid.Health > 0 then
+                                local dist = (pChar.HumanoidRootPart.Position - myPos).Magnitude
+                                if dist <= 8 then enemyClose = true; break end
+                            end
+                        end
+                    end
+                    
+                    if enemyClose or (Settings.LastHealth and hum.Health < Settings.LastHealth) then
+                        if not blockHeld then
+                            VirtualInputManager:SendKeyEvent(true, "F", false, game)
+                            blockHeld = true
+                        end
+                    else
+                        if blockHeld then
+                            VirtualInputManager:SendKeyEvent(false, "F", false, game)
+                            blockHeld = false
+                        end
+                    end
+                end
+                Settings.LastHealth = hum.Health
+            end
+        elseif blockHeld then
+            VirtualInputManager:SendKeyEvent(false, "F", false, game)
+            blockHeld = false
+        end
+    end
+end)
+
+Rayfield:Notify({Title = "YBA GOD MODE V5", Content = "Ультра-буст готов. Жми кнопку в Визуале!", Duration = 5})
