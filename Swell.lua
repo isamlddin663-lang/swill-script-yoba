@@ -10,17 +10,26 @@ local VirtualUser = game:GetService("VirtualUser")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
 local Settings = {
+    -- Аимбот
     AimEnabled = false, AimFOV = 150, AimSmooth = 0.4, MaxAimDistance = 100,
     LockTarget = true, CurrentTarget = nil,
+    
+    -- Фарм
     AutoFarm = false, FarmRange = 45,
     AutoItemFarm = false, ItemFarmRange = 500, TPBack = true,
+    
+    -- Движение
     WalkSpeedEnabled = false, WalkSpeed = 50, InfJump = false,
-    ESPEnabled = true, AutoBlock = false, LastHealth = 100,
-    RemoveSkins = false -- Настройка для ультра-буста
+    
+    -- Визуал & Блок
+    ESPEnabled = true,
+    AutoBlock = false,
+    LastHealth = 100,
+    LowGFX = false
 }
 
 local Window = Rayfield:CreateWindow({
-   Name = "YBA GOD MODE V5 | SWILL",
+   Name = "YBA GOD MODE V6 | SWILL",
    LoadingTitle = "Загрузка...",
    LoadingSubtitle = "by Swill Way",
    Theme = "Amethyst",
@@ -67,9 +76,9 @@ MoveTab:CreateToggle({Name = "Infinite Jump (Беск. прыжок)", CurrentVa
 -- ВИЗУАЛ & ОПТИМИЗАЦИЯ
 -- ==========================================
 VisualTab:CreateButton({
-   Name = "ULTRA FPS BOOST (Без скинов)",
+   Name = "ULTRA FPS BOOST (Без скинов + Low GFX)",
    Callback = function()
-       Settings.RemoveSkins = true
+       Settings.LowGFX = true
        -- 1. Убираем графику
        pcall(function()
            settings().Rendering.QualityLevel = Enum.QualityLevel.Level01
@@ -90,7 +99,7 @@ VisualTab:CreateButton({
            if v:IsA("BasePart") and v.Material ~= Enum.Material.Plastic and v.Material ~= Enum.Material.SmoothPlastic and v.Material ~= Enum.Material.Neon then v.Material = Enum.Material.SmoothPlastic end
        end
        
-       -- 4. Убираем скины со ВСЕХ игроков (включая тебя)
+       -- 4. Убираем скины со ВСЕХ игроков
        local function stripCharacter(char)
            if char then
                for _, v in pairs(char:GetDescendants()) do
@@ -106,7 +115,7 @@ VisualTab:CreateButton({
        end
        Players.PlayerAdded:Connect(function(plr) plr.CharacterAdded:Connect(function(char) task.wait(0.5) stripCharacter(char) end) end)
        
-       Rayfield:Notify({Title = "ULTRA BOOST", Content = "Скины снесены, FPS максимальный!", Duration = 5})
+       Rayfield:Notify({Title = "ULTRA BOOST", Content = "Скины снесены, Low GFX активирован!", Duration = 5})
    end,
 })
 VisualTab:CreateToggle({Name = "ESP (Подсветка игроков)", CurrentValue = true, Flag = "EspToggle", Callback = function(Value) Settings.ESPEnabled = Value end})
@@ -176,8 +185,14 @@ UserInputService.JumpRequest:Connect(function()
 end)
 
 -- ==========================================
--- ЛОГИКА АИМБОТА
+-- ЛОГИКА АИМБОТА (ИСПРАВЛЕНО: КРУГ ВОЗВРАЩЕН)
 -- ==========================================
+local fovCircle = Drawing.new("Circle")
+fovCircle.Thickness = 1
+fovCircle.Color = Color3.fromRGB(255, 255, 255)
+fovCircle.Filled = false
+fovCircle.Visible = false
+
 local function isTargetValid(targetChar)
     if not targetChar or not targetChar.Parent then return false end
     local hum = targetChar:FindFirstChild("Humanoid")
@@ -216,6 +231,11 @@ end
 
 RunService.RenderStepped:Connect(function()
     if Settings.AimEnabled then
+        -- Круг FOV
+        fovCircle.Visible = true
+        fovCircle.Position = Camera.ViewportSize / 2
+        fovCircle.Radius = Settings.AimFOV
+        
         if Settings.LockTarget then
             if Settings.CurrentTarget and isTargetValid(Settings.CurrentTarget) then
             else Settings.CurrentTarget = findBestTarget() end
@@ -226,11 +246,14 @@ RunService.RenderStepped:Connect(function()
             local targetCFrame = CFrame.new(currentCFrame.Position, Settings.CurrentTarget.Head.Position)
             Camera.CFrame = currentCFrame:Lerp(targetCFrame, Settings.AimSmooth)
         end
-    else Settings.CurrentTarget = nil end
+    else 
+        fovCircle.Visible = false
+        Settings.CurrentTarget = nil 
+    end
 end)
 
 -- ==========================================
--- ЛОГИКА AUTO-FARM МОБОВ
+-- ЛОГИКА AUTO-FARM МОБОВ (ИСПРАВЛЕНО)
 -- ==========================================
 task.spawn(function()
     while task.wait(0.2) do
@@ -256,53 +279,47 @@ task.spawn(function()
 end)
 
 -- ==========================================
--- ЛОГИКА AUTO-ITEM FARM
+-- ЛОГИКА AUTO-ITEM FARM (ПОЧИНЕНО ПОД YBA)
 -- ==========================================
 task.spawn(function()
     while task.wait(0.5) do
         if Settings.AutoItemFarm then
             local char = LocalPlayer.Character
             if char and char:FindFirstChild("HumanoidRootPart") then
-                local foundPickUp = false
-                for _, v in pairs(game:GetService("CoreGui"):GetDescendants()) do
-                    if v:IsA("TextLabel") and (v.Text:lower():find("pick up") or v.Text:lower():find("arrow") or v.Text:lower():find("rokakaka")) then
-                        foundPickUp = true; break
-                    end
-                end
-                
-                if foundPickUp then
-                    VirtualInputManager:SendKeyEvent(true, "E", false, game)
-                    task.wait(0.1)
-                    VirtualInputManager:SendKeyEvent(false, "E", false, game)
-                    task.wait(0.5)
-                else
-                    local originalCFrame = char.HumanoidRootPart.CFrame
-                    local myPos = originalCFrame.Position
-                    local foundItem = nil
+                local originalCFrame = char.HumanoidRootPart.CFrame
+                local foundItem = nil
 
-                    for _, v in pairs(Workspace:GetDescendants()) do
-                        local itemName = v.Name:lower()
-                        if (itemName:find("arrow") or itemName:find("rokakaka") or itemName:find("coin") or itemName:find("scroll") or itemName:find("rib cage")) and not v:IsDescendantOf(char) then
-                            local targetPart = v:IsA("BasePart") and v or v:FindFirstChild("Handle") or v.PrimaryPart
-                            if targetPart then
-                                local dist = (targetPart.Position - myPos).Magnitude
-                                if dist <= Settings.ItemFarmRange then
-                                    foundItem = targetPart; break
-                                end
+                -- Ищем предметы в папке Item_Spawns.Items (как в оригинальной игре)
+                local itemFolder = Workspace:FindFirstChild("Item_Spawns")
+                if itemFolder then
+                    local itemsFolder = itemFolder:FindFirstChild("Items")
+                    if itemsFolder then
+                        for _, v in pairs(itemsFolder:GetChildren()) do
+                            if v:IsA("Model") and v.PrimaryPart then
+                                foundItem = v
+                                break
                             end
                         end
                     end
+                end
 
-                    if foundItem then
-                        char.HumanoidRootPart.CFrame = foundItem.CFrame
-                        task.wait(0.3)
+                if foundItem and foundItem.PrimaryPart then
+                    -- ТП к предмету
+                    char.HumanoidRootPart.CFrame = foundItem.PrimaryPart.CFrame - Vector3.new(0, 3, 0)
+                    task.wait(0.3)
+                    -- Жмем Е (или используем ProximityPrompt, если он есть)
+                    local prompt = foundItem:FindFirstChild("ProximityPrompt") or foundItem:FindFirstChildOfClass("ProximityPrompt")
+                    if prompt then
+                        fireproximityprompt(prompt)
+                    else
                         VirtualInputManager:SendKeyEvent(true, "E", false, game)
-                        task.wait(0.3)
+                        task.wait(0.2)
                         VirtualInputManager:SendKeyEvent(false, "E", false, game)
-                        if Settings.TPBack then
-                            task.wait(0.2)
-                            char.HumanoidRootPart.CFrame = originalCFrame
-                        end
+                    end
+                    task.wait(0.4)
+                    -- ТП обратно
+                    if Settings.TPBack then
+                        char.HumanoidRootPart.CFrame = originalCFrame
                     end
                 end
             end
@@ -355,4 +372,4 @@ task.spawn(function()
     end
 end)
 
-Rayfield:Notify({Title = "YBA GOD MODE V5", Content = "Ультра-буст готов. Жми кнопку в Визуале!", Duration = 5})
+Rayfield:Notify({Title = "YBA GOD MODE V6", Content = "Все системы исправлены!", Duration = 5})
